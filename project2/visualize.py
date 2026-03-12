@@ -85,18 +85,21 @@ def visualize_network_with_queues(G, test_case_name):
     es_nodes = [n for n, d in G.nodes(data=True) if d.get('node_type') == 'ES']
     sw_nodes = [n for n, d in G.nodes(data=True) if d.get('node_type') == 'SW']
 
-    # INCREASED node_size to 4500 to comfortably fit the text
+    # INCREASED node_size to comfortably fit the text
     es_col = nx.draw_networkx_nodes(G, pos, nodelist=es_nodes, node_color='lightgreen', node_shape='o', node_size=4500, edgecolors='black')
     if es_col: es_col.set_zorder(5)
     
     sw_col = nx.draw_networkx_nodes(G, pos, nodelist=sw_nodes, node_color='skyblue', node_shape='s', node_size=4500, edgecolors='black')
     if sw_col: sw_col.set_zorder(5)
     
-    # REDUCED font_size slightly to 9 to ensure it stays within borders
+    # REDUCED font_size slightly to ensure it stays within borders
     node_labels = {n: d['label'] for n, d in G.nodes(data=True)}
     drawn_labels = nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=9, font_weight='bold')
     for _, text_obj in drawn_labels.items():
         text_obj.set_zorder(15)
+
+    # Set to keep track of which idle edges we've already drawn
+    drawn_idle_edges = set()
 
     for u, v, data in G.edges(data=True):
         u_pos, v_pos = pos[u], pos[v]
@@ -123,11 +126,23 @@ def visualize_network_with_queues(G, test_case_name):
             
             draw_queue_boxes(ax, mid_x, mid_y, data['queues'], data['link_id'], data['bw'], u, v)
         else:
-            arr_idle = patches.FancyArrowPatch(tuple(u_pos), tuple(v_pos), 
-                                               connectionstyle=f"arc3,rad=0.15", 
-                                               arrowstyle='-|>', mutation_scale=15, 
-                                               shrinkA=30, shrinkB=30, color='lightgray', linestyle='--', linewidth=1.5, zorder=1)
-            ax.add_patch(arr_idle)
+            # Check if the reverse direction is carrying traffic
+            reverse_has_traffic = G.has_edge(v, u) and any(len(flows) > 0 for flows in G[v][u]['queues'].values())
+            
+            # Draw the idle link ONLY IF the reverse path doesn't have traffic AND we haven't drawn it yet
+            if not reverse_has_traffic and (v, u) not in drawn_idle_edges:
+                drawn_idle_edges.add((u, v))
+                
+                # Check if it's bidirectional so we can use a double-sided arrow
+                is_bidirectional = G.has_edge(v, u)
+                arrow_style = '<|-|>' if is_bidirectional else '-|>'
+                
+                # Removed 'connectionstyle' to make it a clean straight line rather than an arc
+                arr_idle = patches.FancyArrowPatch(tuple(u_pos), tuple(v_pos), 
+                                                   arrowstyle=arrow_style, mutation_scale=15, 
+                                                   shrinkA=30, shrinkB=30, color='lightgray', 
+                                                   linestyle='--', linewidth=1.5, zorder=1)
+                ax.add_patch(arr_idle)
 
     legend_elements = [
         patches.Patch(color='lightgreen', label='End System (ES)'),
