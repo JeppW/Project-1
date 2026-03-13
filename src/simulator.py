@@ -1,16 +1,27 @@
 import csv
 import os
 import json
+import random
 from typing import List
 from src.models import Task, Job
 from src.utils import hyperperiod
 
-def simulate(tasks: List[Task], policy: str) -> dict:
-    """
-    Simulate preemptive scheduling for one hyperperiod.
+def _choose_job_runtime(task, model) -> int:
+    if model == "wcet":
+        return task.wcet
+    elif model == "uniform":
+        return random.randint(task.bcet, task.wcet)
+    elif model == "beta":
+        # scaled beta
+        r = random.betavariate(1.5, 3)   # parameters chosen with https://homepage.divms.uiowa.edu/~mbognar/applets/beta.html
+        return task.bcet + int(r * (task.wcet - task.bcet))
 
-    policy: "RM" or "EDF"
-    """
+    else:
+        raise RuntimeError(f"Unsupported runtime model: {model}")
+
+
+def simulate(tasks: List[Task], policy: str, runtime_model="uniform"):
+    """Simulate preemptive scheduling for one hyperperiod."""
     hp = hyperperiod(tasks)
 
     active_jobs: List[Job] = []
@@ -28,7 +39,7 @@ def simulate(tasks: List[Task], policy: str) -> dict:
                     task_id=task.id,
                     release=t,
                     absolute_deadline=t + task.deadline,
-                    remaining=task.wcet,
+                    remaining=_choose_job_runtime(task, runtime_model),
                 ))
 
         # 2. Check deadline misses for jobs whose deadline is now
