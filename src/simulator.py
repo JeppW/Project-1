@@ -46,8 +46,13 @@ def simulate(tasks: List[Task], policy: str) -> dict:
                 # Static priority: smallest period wins; break ties by task id
                 task_map = {task.id: task for task in tasks}
                 best = min(active_jobs, key=lambda j: (task_map[j.task_id].rm_priority, j.task_id))
-            else:  # EDF
+            elif policy == "DM":
+                task_map = {task.id: task for task in tasks}
+                best = min(active_jobs, key=lambda j: (task_map[j.task_id].dm_priority, j.task_id))
+            elif policy == "EDF":
                 best = min(active_jobs, key=lambda j: (j.absolute_deadline, j.task_id))
+            else:
+                raise RuntimeError("Unsupported policy!")
 
             chosen_id = best.task_id
             best.remaining -= 1

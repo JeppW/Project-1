@@ -13,6 +13,11 @@ class Task:
     def rm_priority(self):
         return self.period
 
+    # DM priority: smaller deadline = higher priority (lower number)
+    @property
+    def dm_priority(self):
+        return self.deadline
+
 
 @dataclass
 class Job:
